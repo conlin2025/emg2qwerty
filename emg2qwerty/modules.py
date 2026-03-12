@@ -279,6 +279,46 @@ class TDSConvEncoder(nn.Module):
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.tds_conv_blocks(inputs)  # (T, N, num_features)
 
+class BiGRUEncoder(nn.Module):
+    """A residual bidirectional GRU encoder.
+
+    Input shape:
+        (T, N, num_features)
+
+    Output shape:
+        (T, N, num_features)
+    """
+
+    def __init__(
+        self,
+        num_features: int,
+        hidden_size: int = 384,
+        num_layers: int = 2,
+        bidirectional: bool = True,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+
+        self.gru = nn.GRU(
+            input_size=num_features,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout if num_layers > 1 else 0.0,
+            bidirectional=bidirectional,
+            batch_first=False,
+        )
+
+        out_dim = hidden_size * (2 if bidirectional else 1)
+        self.proj = nn.Linear(out_dim, num_features)
+        self.layer_norm = nn.LayerNorm(num_features)
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        # inputs: (T, N, C)
+        self.gru.flatten_parameters()
+        x, _ = self.gru(inputs)      # (T, N, out_dim)
+        x = self.proj(x)             # (T, N, C)
+        x = x + inputs               # residual
+        return self.layer_norm(x)    # (T, N, C)
 
 class CNNRNNEncoder(nn.Module):
     """A hybrid encoder that applies temporal 1D convolutions followed by a

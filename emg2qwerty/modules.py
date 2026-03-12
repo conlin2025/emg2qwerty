@@ -278,3 +278,82 @@ class TDSConvEncoder(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.tds_conv_blocks(inputs)  # (T, N, num_features)
+
+
+class CNNRNNEncoder(nn.Module):
+    """A hybrid encoder that applies temporal 1D convolutions followed by a
+    bidirectional GRU.
+
+    Input shape:
+        (T, N, num_features)
+
+    Output shape:
+        (T, N, rnn_hidden_size * 2) if bidirectional=True
+        (T, N, rnn_hidden_size) otherwise
+    """
+
+    def __init__(
+        self,
+        num_features: int,
+        conv_channels: int = 256,
+        kernel_size: int = 5,
+        num_conv_layers: int = 2,
+        rnn_hidden_size: int = 256,
+        rnn_num_layers: int = 1,
+        bidirectional: bool = True,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+
+        assert num_conv_layers >= 1
+        assert kernel_size >= 1
+
+        conv_layers: list[nn.Module] = []
+        in_channels = num_features
+
+        for i in range(num_conv_layers):
+            conv_layers.extend(
+                [
+                    nn.Conv1d(
+                        in_channels=in_channels,
+                        out_channels=conv_channels,
+                        kernel_size=kernel_size,
+                        padding=kernel_size // 2,
+                    ),
+                    nn.ReLU(),
+                    nn.Dropout(dropout),
+                ]
+            )
+            in_channels = conv_channels
+
+        self.conv = nn.Sequential(*conv_layers)
+
+        self.rnn = nn.GRU(
+            input_size=conv_channels,
+            hidden_size=rnn_hidden_size,
+            num_layers=rnn_num_layers,
+            dropout=dropout if rnn_num_layers > 1 else 0.0,
+            bidirectional=bidirectional,
+            batch_first=False,
+        )
+
+        self.output_features = rnn_hidden_size * 2 if bidirectional else rnn_hidden_size
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        # inputs: (T, N, C)
+        x = inputs
+
+        # (T, N, C) -> (N, C, T) for Conv1d
+        x = x.permute(1, 2, 0)
+
+        # CNN frontend
+        x = self.conv(x)
+
+        # (N, C, T) -> (T, N, C) for GRU
+        x = x.permute(2, 0, 1)
+
+        # RNN backend
+        x, _ = self.rnn(x)
+
+        # output: (T, N, output_features)
+        return x

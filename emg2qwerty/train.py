@@ -106,13 +106,13 @@ def main(config: DictConfig):
         # Train
         trainer.fit(module, datamodule, ckpt_path=resume_from_checkpoint)
 
-        # Load best checkpoint
-        module = module.load_from_checkpoint(
-            trainer.checkpoint_callback.best_model_path
-        )
+        # For Colab / PyTorch 2.6 compatibility, skip reloading best checkpoint
+        # and just use the in-memory trained module for validation/test.
+        # module = module.load_from_checkpoint(
+        #     trainer.checkpoint_callback.best_model_path
+        # )
 
-    # Validate and test on the best checkpoint (if training), or on the
-    # loaded `config.checkpoint` (otherwise)
+    # Validate and test using the current in-memory module
     val_metrics = trainer.validate(module, datamodule)
     test_metrics = trainer.test(module, datamodule)
 

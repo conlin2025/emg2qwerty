@@ -1,9 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 from collections import Counter
 from typing import Any
 
@@ -50,7 +44,10 @@ class CharacterErrorRates(Metric):
 
     def compute(self) -> dict[str, float]:
         def _error_rate(errors: torch.Tensor) -> float:
-            return float(errors.item() / self.target_len.item() * 100.0)
+            denom = self.target_len.item()
+            if denom == 0:
+                return 0.0
+            return float(errors.item() / denom * 100.0)
 
         return {
             "CER": _error_rate(self.insertions + self.deletions + self.substitutions),

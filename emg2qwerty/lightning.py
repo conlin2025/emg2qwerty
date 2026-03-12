@@ -314,11 +314,12 @@ class CNNRNNCTCModule(pl.LightningModule):
                 bidirectional=bidirectional,
                 dropout=dropout,
             ),
+            nn.LayerNorm(encoder_output_features),
             nn.Linear(encoder_output_features, charset().num_classes),
             nn.LogSoftmax(dim=-1),
         )
 
-        self.ctc_loss = nn.CTCLoss(blank=charset().null_class)
+        self.ctc_loss = nn.CTCLoss(blank=charset().null_class, zero_infinity=True,)
         self.decoder = instantiate(decoder)
 
         metrics = MetricCollection([CharacterErrorRates()])
@@ -364,6 +365,10 @@ class CNNRNNCTCModule(pl.LightningModule):
         for i in range(N):
             target = LabelData.from_labels(targets[: target_lengths[i], i])
             metrics.update(prediction=predictions[i], target=target)
+
+        if phase in {"val", "test"} and N > 0:
+          print("PRED:", predictions[0].text)
+          print("TRUE:", LabelData.from_labels(targets[: target_lengths[0], 0]).text)
 
         self.log(f"{phase}/loss", loss, batch_size=N, sync_dist=True)
         return loss

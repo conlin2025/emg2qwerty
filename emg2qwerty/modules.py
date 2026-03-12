@@ -311,7 +311,7 @@ class CNNRNNEncoder(nn.Module):
         conv_layers: list[nn.Module] = []
         in_channels = num_features
 
-        for i in range(num_conv_layers):
+        for _ in range(num_conv_layers):
             conv_layers.extend(
                 [
                     nn.Conv1d(
@@ -320,6 +320,7 @@ class CNNRNNEncoder(nn.Module):
                         kernel_size=kernel_size,
                         padding=kernel_size // 2,
                     ),
+                    nn.BatchNorm1d(conv_channels),
                     nn.ReLU(),
                     nn.Dropout(dropout),
                 ]
@@ -337,24 +338,23 @@ class CNNRNNEncoder(nn.Module):
             batch_first=False,
         )
 
-        self.output_features = rnn_hidden_size * 2 if bidirectional else rnn_hidden_size
+        self.output_features = (
+            rnn_hidden_size * 2 if bidirectional else rnn_hidden_size
+        )
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-      # inputs: (T, N, C)
+        # inputs: (T, N, C)
 
-      # (T, N, C) -> (N, C, T) for Conv1d
-      x = inputs.permute(1, 2, 0).contiguous()
+        # (T, N, C) -> (N, C, T)
+        x = inputs.permute(1, 2, 0).contiguous()
 
-      # CNN
-      x = self.conv(x).contiguous()
+        # CNN frontend
+        x = self.conv(x).contiguous()
 
-      # (N, C, T) -> (T, N, C) for GRU
-      x = x.permute(2, 0, 1).contiguous()
+        # (N, C, T) -> (T, N, C)
+        x = x.permute(2, 0, 1).contiguous()
 
-      # cuDNN RNNs can be picky about memory layout
-      self.rnn.flatten_parameters()
+        self.rnn.flatten_parameters()
+        x, _ = self.rnn(x)
 
-      # RNN
-      x, _ = self.rnn(x.contiguous())
-
-      return x.contiguous()
+        return x.contiguous()

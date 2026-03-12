@@ -19,6 +19,7 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 from emg2qwerty import transforms, utils
 from emg2qwerty.transforms import Transform
 
+import torch
 torch.backends.cudnn.enabled = False
 
 

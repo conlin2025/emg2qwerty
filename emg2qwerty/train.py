@@ -19,6 +19,8 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 from emg2qwerty import transforms, utils
 from emg2qwerty.transforms import Transform
 
+torch.backends.cudnn.enabled = False
+
 
 log = logging.getLogger(__name__)
 

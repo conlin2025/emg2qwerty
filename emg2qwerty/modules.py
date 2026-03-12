@@ -340,20 +340,21 @@ class CNNRNNEncoder(nn.Module):
         self.output_features = rnn_hidden_size * 2 if bidirectional else rnn_hidden_size
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        # inputs: (T, N, C)
-        x = inputs
+      # inputs: (T, N, C)
 
-        # (T, N, C) -> (N, C, T) for Conv1d
-        x = x.permute(1, 2, 0)
+      # (T, N, C) -> (N, C, T) for Conv1d
+      x = inputs.permute(1, 2, 0).contiguous()
 
-        # CNN frontend
-        x = self.conv(x)
+      # CNN
+      x = self.conv(x).contiguous()
 
-        # (N, C, T) -> (T, N, C) for GRU
-        x = x.permute(2, 0, 1)
+      # (N, C, T) -> (T, N, C) for GRU
+      x = x.permute(2, 0, 1).contiguous()
 
-        # RNN backend
-        x, _ = self.rnn(x)
+      # cuDNN RNNs can be picky about memory layout
+      self.rnn.flatten_parameters()
 
-        # output: (T, N, output_features)
-        return x
+      # RNN
+      x, _ = self.rnn(x.contiguous())
+
+      return x.contiguous()

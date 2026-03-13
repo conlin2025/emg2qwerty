@@ -21,6 +21,7 @@ from emg2qwerty.transforms import Transform
 
 import torch
 torch.backends.cudnn.enabled = False
+torch.set_float32_matmul_precision("medium")
 
 
 log = logging.getLogger(__name__)

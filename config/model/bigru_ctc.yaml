@@ -3,7 +3,9 @@ module:
   _target_: emg2qwerty.lightning.BiGRUCTCModule
   in_features: 528
   mlp_features: [384]
-  hidden_size: 128
+
+  hidden_size: 512
   num_layers: 2
+  
   bidirectional: true
-  dropout: 0.1
+  dropout: 0.3
